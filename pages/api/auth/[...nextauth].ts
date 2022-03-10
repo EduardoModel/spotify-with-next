@@ -1,10 +1,26 @@
 import NextAuth from 'next-auth'
 import SpotifyProvider from 'next-auth/providers/spotify'
-import { LOGIN_URL } from '../../../lib/spotify'
+import spotifyApi, { LOGIN_URL } from '../../../lib/spotify'
 
 async function refreshAccessToken(token) {
   try {
-    
+    spotifyApi.setAccessToken(token.accessToken)
+    spotifyApi.setRefreshToken(token.refreshToken)
+
+    const {
+      body: refreshedToken
+    } = await spotifyApi.refreshAccessToken()
+
+    console.log(refreshedToken)
+
+    return {
+      ...token,
+      accessToken: refreshedToken.access_token,
+      accessTokenExpires: Date.now() + refreshedToken.expires_in * 1000, // it returns 3600 and the * 1000 it's to transform into milisecs
+      // If there is a new refresh token, replace it otherwise use the old one
+      refreshToken: refreshedToken.refresh_token ?? token.refreshToken
+    }
+
   } catch (error) {
     console.error(error)
     return {
@@ -27,13 +43,13 @@ export default NextAuth({
   ],
   secret: process.env.JWT_SECRET,
   pages: {
-    // Define the page to do the login
+    // Define the page responsible for the login
     signIn: '/login'
   },
   callbacks: {
-    // Nextauth token rotation
+    // Nextauth token rotation (auth itself)
     async jwt({token, account, user}) {
-      // Initial sign in
+      // Initial sign in (no refresh token available)
       if(account && user) {
         return {
           ...token,
@@ -50,6 +66,16 @@ export default NextAuth({
 
       // If accessToken expiered, use the refreshToken to get a new one
       return await refreshAccessToken(token)
+    },
+    // The actual creation of the session for the user
+    async session({session, token}) {
+      // Session.user is the data available to the user and he can see it
+      // The accessToken itself is http secure, i.e. no js code on the frontend can access it
+      session.user.accessToken = token.accessToken
+      session.user.refreshToken = token.refreshToken
+      session.user.username = token.username
+
+      return session
     }
   }
 })

@@ -13,7 +13,7 @@ const scopes = [
   'user-read-playback-state',
   'user-modify-playback-state',
   'user-read-currently-playing',
-  'user-read-recently-playing',
+  'user-read-recently-played',
   'user-follow-read',
 ].join(',') // Join the values separating them with a comma
 
